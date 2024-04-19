@@ -116,7 +116,7 @@ func (m Model) View() string {
 	})
 
 	for _, s := range m.scores {
-		rval += fmt.Sprintf("Bucket: %s\n", s.Name)
+		rval += fmt.Sprintf("Bucket: %s (%d)\n", s.Name, s.Points)
 		p := float64(s.Points) / float64(m.total)
 		rval += progress.New(progress.WithWidth(m.width)).ViewAs(p)
 		rval += "\n\n"
