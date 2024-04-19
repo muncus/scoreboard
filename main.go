@@ -32,6 +32,9 @@ type Model struct {
 
 var fetchUrl = flag.String("url", "", "url to fetch content from")
 var jsonField = flag.String("json", "", "top-level json field to read from body")
+var headerField = flag.String("header", "", "HTTP header to read for bucket")
+var reqInterval = flag.Duration("interval", 3*time.Second, "time between requests")
+var useStatus = flag.Bool("status", false, "uses http status as bucket")
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
@@ -144,7 +147,7 @@ func main() {
 }
 
 func tickUrlfetch() tea.Cmd {
-	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+	return tea.Tick(*reqInterval, func(t time.Time) tea.Msg {
 		resp, err := http.Get(*fetchUrl)
 		if err != nil {
 			log.Print(err)
@@ -156,7 +159,17 @@ func tickUrlfetch() tea.Cmd {
 		if err != nil {
 			log.Print(err)
 		}
-		return Score{Name: fmt.Sprint(m[*jsonField]), Points: 1}
+		var name string
+		if len(*jsonField) > 0 {
+			name = fmt.Sprint(m[*jsonField])
+		}
+		if len(*headerField) > 0 {
+			name = resp.Header.Get(*headerField)
+		}
+		if *useStatus {
+			name = resp.Status
+		}
+		return Score{Name: name, Points: 1}
 	})
 
 }
