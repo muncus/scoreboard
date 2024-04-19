@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"sort"
 	"time"
@@ -34,6 +37,7 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		sendEvent(m.scoreChan),
 		readEvent(m.scoreChan),
+		tickUrlfetch(),
 	)
 }
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -63,11 +67,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for i, s := range m.scores {
 			if s.Name == msg.Name {
 				m.scores[i].Points += msg.Points
-				return m, readEvent(m.scoreChan)
+				// return m, readEvent(m.scoreChan)
+				return m, tickUrlfetch()
 			}
 		}
 		m.scores = append(m.scores, msg)
-		return m, readEvent(m.scoreChan)
+		// return m, readEvent(m.scoreChan)
+		return m, tickUrlfetch()
 
 	default:
 		fmt.Printf("not sure about: %#v\n", msg)
@@ -130,9 +136,27 @@ var inDecoder *json.Decoder
 func main() {
 	flag.Parse()
 	inDecoder = json.NewDecoder(os.Stdin)
-	p := tea.NewProgram(initialModel(), tea.WithInput(nil), tea.WithAltScreen())
+	p := tea.NewProgram(initialModel(), tea.WithInput(nil) /* tea.WithAltScreen() */)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
+}
+
+func tickUrlfetch() tea.Cmd {
+	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+		resp, err := http.Get(*fetchUrl)
+		if err != nil {
+			log.Print(err)
+		}
+		defer resp.Body.Close()
+		var m = make(map[string]interface{})
+		b, _ := io.ReadAll(resp.Body)
+		err = json.Unmarshal(b, &m)
+		if err != nil {
+			log.Print(err)
+		}
+		return Score{Name: fmt.Sprint(m[*jsonField]), Points: 1}
+	})
+
 }
